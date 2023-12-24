@@ -1,0 +1,1 @@
+C:\Users\Barry\Downloads\testing_grounds\adventofcode2023\day3\target\debug\day3.exe: C:\Users\Barry\Downloads\testing_grounds\adventofcode2023\day3\input C:\Users\Barry\Downloads\testing_grounds\adventofcode2023\day3\src\main.rs
