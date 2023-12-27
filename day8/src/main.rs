@@ -17,25 +17,32 @@ enum Direction {
 #[derive(Debug)]
 struct Automaton {
     states: BTreeMap<Rc<&'static str>, (Weak<&'static str>, Weak<&'static str>)>,
-    current_state: Weak<&'static str>,
+    inital_states: Vec<Weak<&'static str>>,
 }
 
 impl Automaton {
     fn new(map: &'static str) -> Automaton {
         let mut states = BTreeMap::new();
+        let mut inital_states = Vec::new();
         
         map.lines()
             .for_each(|line| {
-                let [s, a, b] = line.split(|c: char| !c.is_alphabetic())
+                let [s, a, b] = line.split(&['=', ' ', ',', '(', ')'])
                     .filter(|s| !s.is_empty())
                     .collect::<Vec<_>>()[..3] else { unreachable!() };
                 let a = Automaton::get_key_stub(&mut states, a);
                 let b = Automaton::get_key_stub(&mut states, b);
-                states.insert(Rc::new(s), (a, b));
+                
+                let rcs = Rc::new(s);
+                let refrcs = Rc::downgrade(&rcs);
+                
+                states.insert(rcs, (a, b));
+                if s.ends_with('A') {
+                    inital_states.push(refrcs)
+                }
             });
 
-        let current_state = Automaton::get_key_stub(&mut states, "AAA");
-        Automaton { states, current_state }
+        Automaton { states, inital_states }
     }
 
     fn get_key(&self, key: &'static str) -> Weak<&'static str> {
@@ -58,34 +65,41 @@ impl Automaton {
         }
     }
     
-    fn step(&mut self, stepdir: Direction) -> Weak<&str> {
-        let (left, right) = self.states
-            .get(&self.current_state.upgrade().unwrap())
-            .unwrap();
+    fn step(&self, states: &[Weak<&str>], stepdir: Direction) -> Vec<Weak<&str>> {
+        states.iter().map(move |state| {
+            let (left, right) = self.states
+                .get(&state.upgrade().unwrap())
+                .unwrap();
 
-        self.current_state = match stepdir {
-            Direction::Left => left.clone(),
-            Direction::Right => right.clone(),
-        };
-        self.current_state.clone()
+            match stepdir {
+                Direction::Left => left.clone(),
+                Direction::Right => right.clone(),
+            }
+        }).collect()
     }
 }
 
 fn main() {
     let (dirs, maps) = input();
-    let mut auton = Automaton::new(maps);
+    let auton = Automaton::new(maps);
+    let initial = auton.inital_states.clone();
+    let length = initial.len();
 
     let out = dirs.chars()
         .cycle()
         .map(|dir| {
-            let dir = match dir {
+            match dir {
                 'L' => Direction::Left,
                 'R' => Direction::Right,
                 _ => unreachable!()
-            };
-            *auton.step(dir).upgrade().unwrap() == "ZZZ"
+            }
         })
-        .position(|s| s);
+        .scan(initial, |acc, dir| {
+            *acc = auton.step(acc, dir);
+            Some(acc.iter().fold(length, |acc, x| acc - if x.upgrade().unwrap().ends_with('Z') { 1 } else { 0 }))
+        })
+        // .inspect(|s| println!("{:?}", s))
+        .position(|x| x == 0);
 
     println!("{:?}", out.unwrap() + 1);
 }
@@ -95,3 +109,6 @@ fn input() -> (&'static str, &'static str) {
 
     input.split_once("\n\n").unwrap()
 }
+
+
+
