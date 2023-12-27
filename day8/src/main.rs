@@ -71,7 +71,7 @@ impl Automaton {
         states.map(move |state| self.step(&state, &stepdir))
     }
 
-    fn step<'a>(&self, state: &Weak<&'a str>, stepdir: &Direction) -> Weak<&str> {
+    fn step(&self, state: &Weak<&str>, stepdir: &Direction) -> Weak<&str> {
         let (left, right) = self.states
             .get(&state.upgrade().unwrap())
             .unwrap();
@@ -108,17 +108,10 @@ fn main() {
             start = auton.step(&start, &dirs.next().unwrap());
         }
 
-        tot;
+        tot
     }).collect::<Vec<_>>();
-
-        // scan(initial, |acc, dir| {
-        //     *acc = auton.step(acc, dir);
-        //     Some(acc.iter().fold(length, |acc, x| acc - if x.upgrade().unwrap().ends_with('Z') { 1 } else { 0 }))
-        // })
-        // // .inspect(|s| println!("{:?}", s))
-        // .position(|x| x == 0);
-
-    // println!("{:?}", out.unwrap() + 1);
+    
+    println!("{:?}", lcmm(lengths));
 }
 
 fn input() -> (&'static str, &'static str) {
@@ -127,5 +120,18 @@ fn input() -> (&'static str, &'static str) {
     input.split_once("\n\n").unwrap()
 }
 
+fn gcd(mut a: u64, mut b: u64) -> u64 {
+    while b != 0 {
+        (a, b) = (b, a % b)
+    }
+    a
+}
 
+fn lcm(a: u64, b: u64) -> u64 {
+    a * b / gcd(a, b)
+}
+
+fn lcmm(inpt: Vec<u64>) -> u64 {
+    inpt.into_iter().reduce(|a, x| lcm(a, x)).unwrap()
+}
 
