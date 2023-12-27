@@ -27,8 +27,8 @@ fn input() -> Vec<Vec<i64>> {
 }
 
 fn build(set: &[i64]) -> Vec<Vec<i64>> {
-    let mut out = Vec::new();
-    out.push(Vec::from(set));
+    let mut out: Vec<Vec<i64>> = Vec::new();
+    out.push(set.iter().rev().copied().collect());
 
     let mut last = &out[0];
     while last.iter().any(|&s| s != 0) {
