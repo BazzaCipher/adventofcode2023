@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::rc::{Rc, Weak};
 
+#[derive(Clone)]
 enum Direction {
     Left,
     Right
@@ -45,8 +46,8 @@ impl Automaton {
         Automaton { states, inital_states }
     }
 
-    fn get_key(&self, key: &'static str) -> Weak<&'static str> {
-        Rc::downgrade(&self.states.get_key_value(&key).map(|(k, _)| k).unwrap())
+    fn initial_states(&self) -> &Vec<Weak<&'static str>> {
+        &self.inital_states
     }
 
     // Gets a Weak to the key in the states, but otherwise inserts a stub
@@ -65,27 +66,29 @@ impl Automaton {
         }
     }
     
-    fn step(&self, states: &[Weak<&str>], stepdir: Direction) -> Vec<Weak<&str>> {
-        states.iter().map(move |state| {
-            let (left, right) = self.states
-                .get(&state.upgrade().unwrap())
-                .unwrap();
+    fn step_all(&self, states: impl Iterator<Item = Weak<&'static str>>, stepdir: Direction)
+        -> impl Iterator<Item = Weak<&str>> {
+        states.map(move |state| self.step(&state, &stepdir))
+    }
 
-            match stepdir {
-                Direction::Left => left.clone(),
-                Direction::Right => right.clone(),
-            }
-        }).collect()
+    fn step<'a>(&self, state: &Weak<&'a str>, stepdir: &Direction) -> Weak<&str> {
+        let (left, right) = self.states
+            .get(&state.upgrade().unwrap())
+            .unwrap();
+
+        match stepdir {
+            Direction::Left => left.clone(),
+            Direction::Right => right.clone(),
+        }
     }
 }
 
 fn main() {
     let (dirs, maps) = input();
     let auton = Automaton::new(maps);
-    let initial = auton.inital_states.clone();
-    let length = initial.len();
+    let initial = auton.initial_states().into_iter();
 
-    let out = dirs.chars()
+    let directions = dirs.chars()
         .cycle()
         .map(|dir| {
             match dir {
@@ -93,15 +96,29 @@ fn main() {
                 'R' => Direction::Right,
                 _ => unreachable!()
             }
-        })
-        .scan(initial, |acc, dir| {
-            *acc = auton.step(acc, dir);
-            Some(acc.iter().fold(length, |acc, x| acc - if x.upgrade().unwrap().ends_with('Z') { 1 } else { 0 }))
-        })
-        // .inspect(|s| println!("{:?}", s))
-        .position(|x| x == 0);
+        });
 
-    println!("{:?}", out.unwrap() + 1);
+    let lengths = initial.map(|mut start| {
+        let mut tot = 0;
+        let mut dirs = directions.clone();
+        let mut start = start.clone();
+
+        while !start.upgrade().unwrap().ends_with('Z') {
+            tot += 1;
+            start = auton.step(&start, &dirs.next().unwrap());
+        }
+
+        tot;
+    }).collect::<Vec<_>>();
+
+        // scan(initial, |acc, dir| {
+        //     *acc = auton.step(acc, dir);
+        //     Some(acc.iter().fold(length, |acc, x| acc - if x.upgrade().unwrap().ends_with('Z') { 1 } else { 0 }))
+        // })
+        // // .inspect(|s| println!("{:?}", s))
+        // .position(|x| x == 0);
+
+    // println!("{:?}", out.unwrap() + 1);
 }
 
 fn input() -> (&'static str, &'static str) {
