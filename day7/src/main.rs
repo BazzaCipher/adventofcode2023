@@ -2,7 +2,7 @@ use std::collections::{HashMap, BTreeMap};
 use std::cmp::Ordering;
 use lazy_static::lazy_static;
 
-const CARDS: [char; 13] = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
+const CARDS: [char; 13] = ['A', 'K', 'Q', 'T', '9', '8', '7', '6', '5', '4', '3', '2', 'J'];
 
 lazy_static! {
     static ref CARDORDER: BTreeMap<char, usize> = {
@@ -79,8 +79,14 @@ fn compare_card_letters(a: &Hand, b: &Hand) -> Ordering {
 
 impl Hand {
     fn kind(&self) -> Kind {
-        *self.kind.as_ref().unwrap_or(
-            match occurrences(self)[..] {
+        *self.kind.as_ref().unwrap_or({
+            let (jacks, mut matches) = occurrences(self);
+            matches.sort_unstable_by(|a, b| b.cmp(a));
+            match matches.get_mut(0) {
+                Some(a) => *a += jacks,
+                _ => matches.push(jacks) // Equivalent; For decoupling purposes
+            }
+            match matches[..] {
                 [_] => &Kind::FiveofaKind,
                 [a, b] if a == 4 || b == 4 => &Kind::FourofaKind,
                 [_, _] => &Kind::FullHouse,
@@ -88,7 +94,8 @@ impl Hand {
                 [_, _, _] => &Kind::TwoPair,
                 [_, _, _, _] => &Kind::OnePair,
                 _ => &Kind::HighCard
-            })
+            }
+        })
     }
 }
 
@@ -105,15 +112,20 @@ impl PartialOrd for Hand {
     }
 }
 
-fn occurrences(v: &Hand) -> Vec<usize> {
+fn occurrences(v: &Hand) -> (usize, Vec<usize>) {
     let mut m: HashMap<&char, usize> = HashMap::new();
+    let mut jacks = 0;
     let cards = &v.inner;
 
     for x in cards {
+        if *x == 'J' {
+            jacks += 1;
+            continue
+        }
         *m.entry(x).or_default() += 1;
     }
 
-    m.into_values().collect()
+    (jacks, m.into_values().collect())
 }
 
 fn str_to_card(input: &str) -> Hand {
