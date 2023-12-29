@@ -1,3 +1,5 @@
+#![feature(iter_array_chunks)]
+
 use std::ops::Not;
 
 // I think I should've built a tree...
@@ -34,6 +36,12 @@ impl From<Direction> for (isize, isize) {
     }
 }
 
+#[derive(Debug, PartialEq)]
+enum GridCell {
+    Strength(usize),
+    Pipe(char),
+}
+
 impl From<&GridCell> for Vec<Direction> {
     fn from(cell: &GridCell) -> Self {
         use Direction::*;
@@ -50,13 +58,6 @@ impl From<&GridCell> for Vec<Direction> {
             _ => vec![]
         }
     }
-}
-
-
-#[derive(Debug, PartialEq)]
-enum GridCell {
-    Strength(usize),
-    Pipe(char),
 }
 
 type Tile = (isize, isize);
@@ -81,8 +82,8 @@ impl Map {
     fn next(&self, &(r, c): &Tile, dir: &Direction) -> Option<Tile> {
         if  r <= 0 && *dir == Direction::North ||
             c <= 0 && *dir == Direction::West  ||
-            r >= self.dim.1 as isize - 1 && *dir == Direction::South || // TODO: Check if correct
-            c >= self.dim.0 as isize - 1 && *dir == Direction::East {
+            r >= self.dim.1 as isize && *dir == Direction::South ||
+            c >= self.dim.0 as isize && *dir == Direction::East {
             return None
         }
 
@@ -108,19 +109,14 @@ impl Map {
 }
 
 fn main() {
-    use Direction::*;
-
     let mut map = input();
-    let mut stack: Vec<(Tile, Option<Direction>)> = Vec::new(); // Want to support as many things
-                                                                // as possible, so allow for the
-                                                                // initial position
-    println!("{:?}", map);
+    let mut stack: Vec<(Tile, Option<Direction>)> = Vec::new();
+    let mut loopmap = vec![vec![false; map.inner[0].len()]; map.inner.len()];
 
     let Some((i, j)) = map.find_rodent() else { unreachable!() };
-    // map.inner[i as usize][j as usize] = GridCell::Strength(0);
-    stack.push(((i, j), None));
-
+    
     let mut currstren = 0;
+    stack.push(((i, j), None));
 
     while let Some(((r, c), d)) = stack.pop() {
         // Nested because compound statements are not supported yet
@@ -132,26 +128,54 @@ fn main() {
         } else if let GridCell::Pipe(_) = cell {
             let alldir: Vec<Direction> = cell.into();
 
-            println!("{:?}", alldir);
             let mut addlen = alldir.into_iter()
                 .filter_map(|pipedir| {
                     if let Some(dir) = d.clone() { if pipedir == !dir { return None } }
                     map.next(&(r, c), &pipedir).map(|c| (c, Some(pipedir)))
                 })
                 .collect::<Vec<_>>();
+
+            // Need this in case the first time search doesn't work
+            // if addlen.is_empty() {
+            //     loopmap = vec![vec![false; map.inner[0].len()]; map.inner.len()];
+            // }
+
             stack.append(&mut addlen);
+            println!("{:?}, {:?}", r, c);
 
             map.inner[r as usize][c as usize] = GridCell::Strength(currstren);
+            loopmap[r as usize][c as usize] = true;
             currstren += 1
         }
     }
+
+    println!("Loop map: {:?}", loopmap);
+    let out: usize = loopmap.into_iter().map(|row| {
+        let m = row.iter()
+            .enumerate()
+            // True if searching for next match
+            .filter(|(i, &s)| s)
+            .array_chunks()
+            .map(|[(i, _), (j, _)]| j - i - 1)
+            .sum::<usize>();
+        println!("{m}");
+        m
+    }).sum();
+    println!("{out}");
 }
 
 fn input() -> Map {
     // let input = include_str!("../input");
-    let input = "|LJ
-JS7
-FJ|";
+    let input = ".F----7F7F7F7F-7....
+.|F--7||||||||FJ....
+.||.FJ||||||||L7....
+FJL7L7LJLJ||LJ.L-7..
+L--J.L7...LJS7F-7L7.
+....F-J..F7FJ|L7L7L7
+....L7.F7||L7|.L7L7|
+.....|FJLJ|FJ|F7|.LJ
+....FJL-7.||.||||...
+....L---J.LJ.LJLJ...";
 
     let inner: Vec<Vec<_>> = input.lines()
         .map(|s| s.chars().map(GridCell::Pipe).collect())
