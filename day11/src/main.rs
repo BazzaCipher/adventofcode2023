@@ -1,43 +1,57 @@
+use std::iter::once;
+use std::collections::BTreeSet;
+
+const SCALE: u64 = 1_000_000 - 1;
+
 fn main() {
     let inpt = input();
 
-    let mut latergalaxy = Vec::new();
+    let emptyrows = BTreeSet::from_iter(inpt.iter()
+        .enumerate()
+        .filter(|(_, row)| row.iter().all(|s| s == &'.'))
+        .map(|(i, _)| i));
+    let emptycols = BTreeSet::from_iter((0..inpt[0].len()) // Assuming squareness
+        .filter(|c|
+            (0..inpt.len())
+                .enumerate()
+                .zip(once(c).cycle())
+                .all(|((_, r), c)| inpt[r][*c] == '.')
+        ));
 
-    for row in inpt.iter() {
-        if row.iter().all(|s| s == &'.') { latergalaxy.push(row.clone()) }
-        latergalaxy.push(row.to_vec())
-    }
-
-    println!("{:?}", latergalaxy);
-    let mut ins = vec![];
-    // cannot be arsed for part 1
-    (0..inpt[0].len()).for_each(|colind| {
-        if inpt.iter().map(|x| x[colind]).all(|s| s == '.') { ins.push(colind) }
-    });
-
-    for (i, ind) in ins.iter().enumerate() {
-        latergalaxy.iter_mut().for_each(|row|
-            row.insert(i + ind, '.')
-        );
-    }
-    println!("{:?}", latergalaxy);
-
-    let galax = find_galaxies(&latergalaxy);
+    let galaxies = find_galaxies(&inpt);
     let mut idx = 0;
-
     let mut tot: u64 = 0;
 
-    while idx != galax.len() {
-        for i in idx..galax.len() {
-            tot += dist(&galax[idx], &galax[i]);
+    while idx != galaxies.len() {
+        for i in idx..galaxies.len() {
+            tot += dist(&galaxies[idx], &galaxies[i]);
+
+            let min = galaxies[idx].0.min(galaxies[i].0);
+            let max = galaxies[idx].0.max(galaxies[i].0);
+            tot += emptyrows.range(min..=max).count() as u64 * SCALE;
+
+            let min = galaxies[idx].1.min(galaxies[i].1);
+            let max = galaxies[idx].1.max(galaxies[i].1);
+            tot += emptycols.range(min..=max).count() as u64 * SCALE;
         }
         idx += 1;
     }
+
     println!("{tot}");
 }
 
 fn input() -> Vec<Vec<char>> {
     let input = include_str!("../input");
+//     let input = "...#......
+// .......#..
+// #.........
+// ..........
+// ......#...
+// .#........
+// .........#
+// ..........
+// .......#..
+// #...#.....";
 
     input.lines()
         .map(|x| x.chars().collect())
